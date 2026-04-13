@@ -1,2 +1,8 @@
-# BD3_Lab2
-MongoDB
+# UMDB Template
+
+```bash
+docker compose up --build
+```
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:4000`
