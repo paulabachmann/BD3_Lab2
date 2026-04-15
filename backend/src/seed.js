@@ -58,9 +58,13 @@ async function importFromSingleCsv(csvPath) {
   for (const row of rows) {
     const movieId = toNumber(row.movieId, 0);
     if (!movieId) continue;
+    if (row.json_review_count>5000) continue;
 
     const categories = parseJsonArray(row.categories).map(String);
     const actors = parseJsonArray(row.actors).map(String);
+    
+    if (actors.length>100) continue;
+
     const directors = parseJsonArray(row.directors).map(String);
     const writers = parseJsonArray(row.writers).map(String);
     const crew = parseJsonArray(row.crew).map(String);
@@ -92,6 +96,8 @@ async function importFromSingleCsv(csvPath) {
     const parsedReviews = parseJsonArray(row.reviews);
 
     parsedReviews.forEach((review, index) => {
+      if (JSON.stringify(review).length>10000) return;
+
       const text = String(review.text || '').trim();
       if (!text) return;
 
