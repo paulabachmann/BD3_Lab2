@@ -123,6 +123,7 @@ async function importFromSingleCsv(csvPath) {
 
     try {
       const movieId = validateRowShape(row);
+      if (row.json_review_count>5000) continue;
       const categories = parseJsonArray(row.categories, {
         field: 'categories',
         rowNumber,
@@ -133,6 +134,7 @@ async function importFromSingleCsv(csvPath) {
         rowNumber,
         movieId
       }).map(String);
+      if (actors.length>100) continue;
       const directors = parseJsonArray(row.directors, {
         field: 'directors',
         rowNumber,
@@ -181,7 +183,8 @@ async function importFromSingleCsv(csvPath) {
       parsedReviews.forEach((review, index) => {
         const text = String(review.text || '').trim();
         if (!text) return;
-
+        if (JSON.stringify.length>10000) return;
+        
         // review_id generado de forma determinística:
         // movieId * 100000 + índice local
         // suficiente si no esperás >100000 reviews por película
