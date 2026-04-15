@@ -29,8 +29,8 @@ app.get('/api/movies', async (req, res) => {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const skip = (page - 1) * limit;
 
-    const movies = await Movie.find({})
-      .sort({ year: -1, title: 1 })
+    const movies = await Movie.find({},{year:1, title: 1, avg_rating:1, categories:1, actors:1})
+      .sort({ year: -1, title: 1})
       .skip(skip)
       .limit(limit)
       .lean();
