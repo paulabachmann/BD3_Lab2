@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { seedOnStartup } = require('./seed');
 const Movie = require('./models/Movie');
 const Review = require('./models/Review');
+const User = require('./models/user');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -90,6 +91,103 @@ app.get('/api/best_movies', async (req, res) => {
     res.json({ ok: true, data: movies });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/api/user', async (req, res) => {
+  try{
+    const username = String(req.body?.username ?? "").trim();
+    const password = String(req.body?.password ?? '').trim();
+    if (!user || !password){
+      return res.status(400).json({ message: "Username and password are required fields." });
+    }
+    const bcrypt = require('bcrypt');
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await User.create({username, hashedPassword});
+    return res.status(201).json({
+      message: "User created successfully",
+      user: newUser
+    });
+  } catch (error){
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Username already exists"
+      });
+    }
+    return res.status(500).json({message: "The user could not be created", error: error.message,});
+    }
+});
+
+app.get('/api/users/:username', async (req, res) => {
+  try{
+    const username = req.params.username;
+    const user = await User.findOne({username});
+    if (!user){
+      return res.status(400).json({message: "User does not exist."});
+    }
+
+    res.json({ok: true, user});
+
+  } catch (error){
+    return res.status(500).json({message: "The users info could not be fetched.", error: error.message});
+    }
+  });
+
+app.get('/api/users/:username/watchlist', async (req, res) => {
+  try{
+    const username = req.params.username;
+    
+    const user = await User.findOne({username});
+    if (!user){
+      return res.status(400).json({message: "User does not exist."});
+    }
+    const watchlist = user.watchlist;
+
+    res.json({ok: true, watchlist});
+  } catch (error){
+    return res.status(500).json({message: "The watchlist could not be fetched.", error: error.message});
+    }
+})
+
+app.post('/api/users/:username/watchlist', async(req, res) => {
+  try{
+    const username = req.params.username;
+    const movieId = Number((req.body?.movieId?? "").trim());
+    if (!username || movieId.isNaN){
+      return res.status(400).json({message: "Username or movieId is missing."})
+    }
+    const result = await User.updateOne({ username }, { $addToSet: { watchlist: movieId }});
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+    res.json({ok:true})
+  } catch(error){
+    return res.status(500).json({message: "The movie could not be added to the watchlist.", error: error.message});
+  }
+})
+
+app.delete('/api/users/:username/watchlist/:movieId', async (req,res) => {
+  try{
+    const username= req.params.username;
+    const movieId = Number(req.params.movieId);
+    if (!username || !movieId){
+      return res.status(400).json({message: "Username or movieId is missing."})
+    }
+   const result = await User.updateOne(
+    { username: username },
+    { $pull: { watchlist : movieId } })
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+  } 
+  return res.json({ok:true});
+
+  } catch (error) {
+    return res.status(500).json({message: "The movie could not be deleted from the watchlist.", error: error.message});
   }
 });
 
