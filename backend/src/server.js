@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const { seedOnStartup } = require('./seed');
 const Movie = require('./models/Movie');
 const Review = require('./models/Review');
-const User = require('./models/user');
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -98,7 +98,7 @@ app.post('/api/user', async (req, res) => {
   try{
     const username = String(req.body?.username ?? "").trim();
     const password = String(req.body?.password ?? '').trim();
-    if (!user || !password){
+    if (!username || !password){
       return res.status(400).json({ message: "Username and password are required fields." });
     }
     const bcrypt = require('bcrypt');
@@ -152,8 +152,8 @@ app.get('/api/users/:username/watchlist', async (req, res) => {
 app.post('/api/users/:username/watchlist', async(req, res) => {
   try{
     const username = req.params.username;
-    const movieId = Number((req.body?.movieId?? "").trim());
-    if (!username || movieId.isNaN){
+    const movieId = Number(req.body?.movieId);
+    if (!username || isNaN(movieId)){
       return res.status(400).json({message: "Username or movieId is missing."})
     }
     const result = await User.updateOne({ username }, { $addToSet: { watchlist: movieId }});
