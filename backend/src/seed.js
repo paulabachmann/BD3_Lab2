@@ -34,14 +34,45 @@ function parseJsonArray(value, context = {}) {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
-    const fieldText = context.field ? ` field=${context.field}` : '';
-    const rowText = context.rowNumber ? ` row=${context.rowNumber}` : '';
-    const movieText = context.movieId ? ` movieId=${context.movieId}` : '';
+    const normalizedValue = String(value)
+      .trim()
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\');
 
-    throw new Error(
-      `Failed to parse JSON array${fieldText}${rowText}${movieText}: ${err.message}`
-    );
+    try {
+      const parsed = JSON.parse(normalizedValue);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (normalizedErr) {
+      const fieldText = context.field ? ` field=${context.field}` : '';
+      const rowText = context.rowNumber ? ` row=${context.rowNumber}` : '';
+      const movieText = context.movieId ? ` movieId=${context.movieId}` : '';
+
+      throw new Error(
+        `Failed to parse JSON array${fieldText}${rowText}${movieText}: ${normalizedErr.message}`
+      );
+    }
   }
+}
+
+function parseReviews(value, context = {}) {
+  const parsed = parseJsonArray(value, context);
+
+  return parsed
+    .filter((review) => review && typeof review === 'object' && !Array.isArray(review))
+    .map((review) => ({
+      text: typeof review.text === 'string' ? review.text : String(review.text || ''),
+      rating: toNumber(review.rating, null),
+      timestamp: review.timestamp
+    }));
+}
+
+function toShortText(value, maxLength = 10000) {
+  const text = String(value || '').trim();
+  return text.length <= maxLength ? text : null;
+}
+
+function toReviewId(movieId, index) {
+  return movieId * 100000 + index;
 }
 
 function toDateFromTimestamp(value) {
@@ -63,6 +94,7 @@ async function readCsv(filePath) {
       .pipe(
         csv({
           separator: ',',
+          escape: '\\',
           mapHeaders: ({ header }) => header.trim()
         })
       )
@@ -150,7 +182,7 @@ async function importFromSingleCsv(csvPath) {
         rowNumber,
         movieId
       }).map(String);
-      const parsedReviews = parseJsonArray(row.reviews, {
+      const parsedReviews = parseReviews(row.reviews, {
         field: 'reviews',
         rowNumber,
         movieId
@@ -181,14 +213,10 @@ async function importFromSingleCsv(csvPath) {
       });
 
       parsedReviews.forEach((review, index) => {
-        const text = String(review.text || '').trim();
+        const text = toShortText(review.text);
         if (!text) return;
-        if (JSON.stringify.length>10000) return;
-        
-        // review_id generado de forma determinística:
-        // movieId * 100000 + índice local
-        // suficiente si no esperás >100000 reviews por película
-        const review_id = movieId * 100000 + index;
+
+        const review_id = toReviewId(movieId, index);
 
         reviewOps.push({
           updateOne: {
@@ -213,8 +241,12 @@ async function importFromSingleCsv(csvPath) {
   }
 
   if (movieOps.length) {
-    await Movie.bulkWrite(movieOps, { ordered: false });
-    console.log(`Movies upserted: ${movieOps.length}`);
+    try {
+      await Movie.bulkWrite(movieOps, { ordered: false });
+      console.log(`Movies upserted: ${movieOps.length}`);
+    } catch (error) {
+      console.error(`Error occurred while upserting movies: ${error.message}`);
+    }
   }
 
   if (reviewOps.length) {
